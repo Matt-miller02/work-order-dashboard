@@ -136,7 +136,7 @@ def process_xlsx(xlsx_bytes):
             "AssignedUser": get_col(row, "Assigned User", "AssignedUser"),
             "CreatedAt":    get_col(row, "Created At", "CreatedAt", "created at"),
             "Description":  get_col(row, "Service Request Description", "Description", "Job Description"),
-            "URL":          get_col(row, "WorkOrderURLLink", "AppFolio Link", "Link"),
+            "URL":          get_col(row, "AppFolio Link", "WorkOrderURLLink", "Link"),
         }
         # Clean up description length
         if r["Description"]:
