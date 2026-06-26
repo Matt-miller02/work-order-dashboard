@@ -96,29 +96,24 @@ def process_xlsx(xlsx_bytes):
     # Read raw without headers to find the correct header row
     raw = pd.read_excel(tmp_path, sheet_name=0, header=None)
 
-    # Find the header row — look for row with work order related column headers
+    # Find the header row — must have BOTH 'PropertyAbbrev' and 'Assigned User'
+    # This is the only row in the file that has both — prevents picking up wrong table
     header_row = None
     for i in range(len(raw)):
-        row_vals = [str(v).strip().lower() for v in raw.iloc[i].tolist()]
-        row_str = ' '.join(row_vals)
-        # Must contain assigned user AND a work order identifier
-        if 'assigned user' in row_str and ('work order number' in row_str or 'work order #' in row_str):
+        row_vals = [str(v).strip() for v in raw.iloc[i].tolist()]
+        if 'PropertyAbbrev' in row_vals and 'Assigned User' in row_vals:
             header_row = i
-            print(f"  Header row found at row {i}: {[str(v).strip() for v in raw.iloc[i].tolist() if str(v) != 'nan'][:6]}")
+            print(f"  Header row found at row {i}: {[v for v in row_vals if v != 'nan'][:6]}")
             break
-        # Fallback: row with propertyabbrev and status
-        if 'propertyabbrev' in row_str and 'status' in row_str and header_row is None:
-            header_row = i
-            print(f"  Header row found (fallback) at row {i}")
 
     if header_row is None:
-        # Last resort: print all rows to help debug
-        print("  Could not find header row. Printing non-empty rows:")
-        for i in range(min(30, len(raw))):
-            row_vals = [str(v).strip() for v in raw.iloc[i].tolist() if str(v) != 'nan']
-            if row_vals:
-                print(f"    Row {i}: {row_vals[:6]}")
-        raise Exception("Could not find header row — see row dump above for debugging")
+        # Debug: print all rows so we can see what's in the file
+        print("  Could not find header row. All non-empty rows:")
+        for i in range(len(raw)):
+            row_vals = [str(v).strip() for v in raw.iloc[i].tolist() if str(v).strip() not in ('nan', '')]
+            if len(row_vals) >= 3:
+                print(f"    Row {i}: {row_vals[:8]}")
+        raise Exception("Could not find header row with 'PropertyAbbrev' and 'Assigned User'")
 
     # Read with correct header row
     df = pd.read_excel(tmp_path, sheet_name=0, header=header_row)
