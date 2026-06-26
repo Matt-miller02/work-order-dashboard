@@ -96,17 +96,29 @@ def process_xlsx(xlsx_bytes):
     # Read raw without headers to find the correct header row
     raw = pd.read_excel(tmp_path, sheet_name=0, header=None)
 
-    # Find the header row — look for the row containing 'Link' and 'Assigned User'
+    # Find the header row — look for row with work order related column headers
     header_row = None
     for i in range(len(raw)):
-        row_vals = [str(v).strip() for v in raw.iloc[i].tolist()]
-        if 'Link' in row_vals and 'Assigned User' in row_vals:
+        row_vals = [str(v).strip().lower() for v in raw.iloc[i].tolist()]
+        row_str = ' '.join(row_vals)
+        # Must contain assigned user AND a work order identifier
+        if 'assigned user' in row_str and ('work order number' in row_str or 'work order #' in row_str):
             header_row = i
-            print(f"  Header row found at row {i}")
+            print(f"  Header row found at row {i}: {[str(v).strip() for v in raw.iloc[i].tolist() if str(v) != 'nan'][:6]}")
             break
+        # Fallback: row with propertyabbrev and status
+        if 'propertyabbrev' in row_str and 'status' in row_str and header_row is None:
+            header_row = i
+            print(f"  Header row found (fallback) at row {i}")
 
     if header_row is None:
-        raise Exception("Could not find header row containing 'Link' and 'Assigned User'")
+        # Last resort: print all rows to help debug
+        print("  Could not find header row. Printing non-empty rows:")
+        for i in range(min(30, len(raw))):
+            row_vals = [str(v).strip() for v in raw.iloc[i].tolist() if str(v) != 'nan']
+            if row_vals:
+                print(f"    Row {i}: {row_vals[:6]}")
+        raise Exception("Could not find header row — see row dump above for debugging")
 
     # Read with correct header row
     df = pd.read_excel(tmp_path, sheet_name=0, header=header_row)
