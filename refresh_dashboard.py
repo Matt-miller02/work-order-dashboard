@@ -142,75 +142,51 @@ def process_xlsx(xlsx_bytes):
                 print(f"  Data starts at row {i}")
                 break
 
-        # Col mapping (0-indexed):
-        # 0=URL, 1=PropertyAbbrev(sparse), 2=CreatedAt, 3=WONumber, 4=Unit,
-        # 5=Status, 6=AssignedUser, 7=Priority, 8=ResidentRequested, 9=Recurring,
-        # 10=CreatedBy, 11=WorkOrderType, 12=Description, 13-15=comments,
-        # 16=AppFolioLink
+        # Confirmed col layout from live logs:
+        # 0=Property(full+address), 1=Priority, 2=WOType, 3=WONumber, 4=Status,
+        # 5=Unit, 6=CreatedAt, 7=CreatedBy, 8=AssignedUser, 16=JobDescription
 
-        # Forward-fill PropertyAbbrev (col 1) since it's sparse
-        last_prop = None
-        prop_col = {}
-        for i in range(data_start, len(raw)):
-            val = clean(raw.iloc[i, 1])
-            if val:
-                last_prop = val
-            prop_col[i] = last_prop
-
-        # Print first 3 data rows so we can verify column positions
-        print("  First 3 data rows for column verification:")
-        for di in range(data_start, min(data_start+3, len(raw))):
-            print(f"    Row {di}: {[str(v).strip() for v in raw.iloc[di].tolist()]}")
+        # Property is in col 0 every row (full name with address) — no ffill needed
+        # AssignedUser is in col 8 but sometimes blank
 
         records = []
         for i in range(data_start, len(raw)):
-            row = raw.iloc[i].tolist()
-            row = [clean(v) for v in row]
+            row = [clean(v) for v in raw.iloc[i].tolist()]
 
-            # Col 3 must be a WO number
-            wo = str(row[3]).strip() if row[3] else None
+            # Col 3 must be a valid WO number
+            wo = str(row[3]).strip() if len(row) > 3 and row[3] else None
             if not wo or not wo_pattern.match(wo):
                 continue
 
-            # Find status — search all columns for a known status value
-            status = None
-            for col_idx, val in enumerate(row):
-                if str(val).strip() in OPEN_STATUSES:
-                    status = str(val).strip()
-                    break
-            if not status:
+            # Status is col 4 — only include open statuses
+            status = str(row[4]).strip() if len(row) > 4 and row[4] else None
+            if not status or status not in OPEN_STATUSES:
                 continue
 
-            # Col layout (confirmed from logs):
-            # 0=Property(full), 1=Priority, 2=WOType, 3=WONumber, 4=Status,
-            # 5=Unit, 6=CreatedAt, 7=CreatedBy, 8=AssignedUser(?),
-            # 16=JobDescription
-
-            # Find assigned user — search cols 7 onwards for a non-nan person name
-            assigned = None
-            for ci in range(7, min(12, len(row))):
-                v = str(row[ci]).strip() if row[ci] else ''
-                if v and v.lower() not in ('nan', 'no', 'yes', '') and not v.startswith('http') and not re.match(r'^\d', v):
-                    assigned = v
-                    break
-
-            desc = str(row[16])[:300].strip() if len(row) > 16 and row[16] else None
-            if desc and desc.lower() == 'nan':
-                desc = None
-
-            # URL — col 0 starts with http in this format
-            url = str(row[0]).strip() if row[0] and str(row[0]).startswith('http') else None
-
-            # Extract short property name (before the dash)
-            prop_raw = prop_col.get(i)
+            # Extract short property name from col 0 (strip address after ' - ')
+            prop_raw = str(row[0]).strip() if row[0] else None
             if prop_raw and ' - ' in prop_raw:
                 prop = prop_raw.split(' - ')[0].strip()
-            else:
+            elif prop_raw and prop_raw.lower() != 'nan':
                 prop = prop_raw
+            else:
+                prop = None
+
+            # Assigned user — col 8
+            assigned = str(row[8]).strip() if len(row) > 8 and row[8] and str(row[8]).lower() != 'nan' else None
+
+            # Description — col 16
+            desc = str(row[16])[:300].strip() if len(row) > 16 and row[16] and str(row[16]).lower() != 'nan' else None
+
+            # URL — col 0 if it starts with http, otherwise None
+            url = str(row[0]).strip() if row[0] and str(row[0]).startswith('http') else None
+            # If col 0 was property name, no URL available in this format
+            if url and 'appfolio' not in url:
+                url = None
 
             r = {
                 "Property":     prop,
-                "Unit":         str(row[5]).strip() if len(row) > 5 and row[5] else None,
+                "Unit":         str(row[5]).strip() if len(row) > 5 and row[5] and str(row[5]).lower() != 'nan' else None,
                 "Status":       status,
                 "Priority":     str(row[1]).strip() if len(row) > 1 and row[1] else None,
                 "Type":         str(row[2]).strip() if len(row) > 2 and row[2] else None,
