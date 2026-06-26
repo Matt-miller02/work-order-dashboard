@@ -93,13 +93,21 @@ def process_xlsx(xlsx_bytes):
         f.write(xlsx_bytes)
         tmp_path = f.name
 
-    # Try the known sheet name first, fall back to first sheet
-    try:
-        df = pd.read_excel(tmp_path, sheet_name="PowerQueryresult", header=0)
-    except Exception:
-        df = pd.read_excel(tmp_path, sheet_name=0, header=0)
+    # Auto-detect header row — find the first row with 4+ non-null values
+    # that contains known column names
+    raw = pd.read_excel(tmp_path, sheet_name=0, header=None)
+    header_row = 0
+    for i in range(len(raw)):
+        row_vals = [str(v).strip() for v in raw.iloc[i].tolist() if str(v) != 'nan']
+        row_str = ' '.join(row_vals).lower()
+        if 'work order' in row_str or 'assigned user' in row_str or 'status' in row_str:
+            if len(row_vals) >= 4:
+                header_row = i
+                print(f"  Header row detected at row {i}: {row_vals[:6]}")
+                break
 
-    print(f"  Columns: {df.columns.tolist()}")
+    df = pd.read_excel(tmp_path, sheet_name=0, header=header_row)
+    print(f"  Columns: {df.columns.tolist()[:8]}")
     print(f"  Rows: {len(df)}")
 
     def clean(v):
@@ -108,20 +116,34 @@ def process_xlsx(xlsx_bytes):
         if hasattr(v, "isoformat"): return str(v)[:10]
         return str(v) if not isinstance(v, (int, float)) else v
 
+    # Map column names flexibly
+    def get_col(row, *names):
+        for name in names:
+            for col in df.columns:
+                if str(col).strip().lower() == name.lower():
+                    return clean(row.get(col))
+        return None
+
     records = []
     for _, row in df.iterrows():
         r = {
-            "Property":     clean(row.get("PropertyAbbrev")) or clean(row.get("Property")),
-            "Unit":         clean(row.get("Unit")),
-            "Status":       clean(row.get("Status")),
-            "Priority":     clean(row.get("Priority")),
-            "Type":         clean(row.get("Work Order Type")),
-            "WONumber":     clean(row.get("Work Order Number")),
-            "AssignedUser": clean(row.get("Assigned User")),
-            "CreatedAt":    str(row.get("Created At", ""))[:10] if row.get("Created At") else None,
-            "Description":  str(row.get("Service Request Description", "") or "")[:300].strip() or None,
-            "URL":          clean(row.get("WorkOrderURLLink")),
+            "Property":     get_col(row, "PropertyAbbrev", "Property", "property abbrev"),
+            "Unit":         get_col(row, "Unit"),
+            "Status":       get_col(row, "Status"),
+            "Priority":     get_col(row, "Priority"),
+            "Type":         get_col(row, "Work Order Type", "WorkOrderType", "type"),
+            "WONumber":     get_col(row, "Work Order Number", "WorkOrderNumber", "work order #"),
+            "AssignedUser": get_col(row, "Assigned User", "AssignedUser"),
+            "CreatedAt":    get_col(row, "Created At", "CreatedAt", "created at"),
+            "Description":  get_col(row, "Service Request Description", "Description", "Job Description"),
+            "URL":          get_col(row, "WorkOrderURLLink", "AppFolio Link", "Link"),
         }
+        # Clean up description length
+        if r["Description"]:
+            r["Description"] = str(r["Description"])[:300].strip()
+        # Skip completely empty rows
+        if not any([r["Property"], r["WONumber"], r["Status"]]):
+            continue
         records.append(r)
 
     os.unlink(tmp_path)
