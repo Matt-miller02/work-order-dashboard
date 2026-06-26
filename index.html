@@ -149,11 +149,7 @@
   </div>
   <div class="filter-group">
     <div class="filter-label">Type</div>
-    <div class="type-chip-list" id="type-chips">
-      <button class="type-chip active" data-type="Resident"   onclick="toggleType('Resident')">Resident</button>
-      <button class="type-chip active" data-type="Internal"   onclick="toggleType('Internal')">Internal</button>
-      <button class="type-chip active" data-type="Unit Turn"  onclick="toggleType('Unit Turn')">Unit Turn</button>
-    </div>
+    <div class="type-chip-list" id="type-chips"></div>
   </div>
   <div class="filter-group">
     <div class="filter-label">Priority</div>
@@ -199,7 +195,7 @@ const RAW = [{"Property": null, "Unit": 118, "Status": "Assigned", "Priority": "
 
 let activePeople = new Set();
 let activeProp   = null;
-let activeTypes  = new Set(['Resident', 'Internal', 'Unit Turn']);
+let activeTypes  = new Set();
 let sortCol = 'ageDays';
 let sortDir = -1;
 
@@ -208,6 +204,21 @@ function showRefreshInstructions() {
 }
 
 // ---- FILTERING ----
+function buildTypeChips() {
+  const types = [...new Set(RAW.map(r => r.Type).filter(Boolean))].sort();
+  activeTypes = new Set(types);
+  const container = document.getElementById('type-chips');
+  container.innerHTML = '';
+  types.forEach(type => {
+    const btn = document.createElement('button');
+    btn.className = 'type-chip active';
+    btn.dataset.type = type;
+    btn.textContent = type;
+    btn.onclick = () => toggleType(type);
+    container.appendChild(btn);
+  });
+}
+
 function toggleType(type) {
   if (activeTypes.has(type)) {
     if (activeTypes.size === 1) return; // keep at least one
@@ -434,6 +445,7 @@ function clearSel() {
     }
   });
 })();
+buildTypeChips();
 applyFilters();
 </script>
 </body>

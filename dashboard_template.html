@@ -137,8 +137,8 @@
   <div class="filter-group">
     <div class="filter-label">Status</div>
     <select id="filter-status" onchange="applyFilters()">
-      <option value="open">Open Only</option>
-      <option value="" selected>All Statuses</option>
+      <option value="open" selected>Open Only</option>
+      <option value="">All Statuses</option>
       <option value="Assigned">Assigned</option>
       <option value="New">New</option>
       <option value="Scheduled">Scheduled</option>
@@ -149,11 +149,7 @@
   </div>
   <div class="filter-group">
     <div class="filter-label">Type</div>
-    <div class="type-chip-list" id="type-chips">
-      <button class="type-chip active" data-type="Resident"   onclick="toggleType('Resident')">Resident</button>
-      <button class="type-chip active" data-type="Internal"   onclick="toggleType('Internal')">Internal</button>
-      <button class="type-chip active" data-type="Unit Turn"  onclick="toggleType('Unit Turn')">Unit Turn</button>
-    </div>
+    <div class="type-chip-list" id="type-chips"></div>
   </div>
   <div class="filter-group">
     <div class="filter-label">Priority</div>
@@ -199,7 +195,7 @@ const RAW = DATA_PLACEHOLDER;
 
 let activePeople = new Set();
 let activeProp   = null;
-let activeTypes  = new Set(['Resident', 'Internal', 'Unit Turn']);
+let activeTypes  = new Set();
 let sortCol = 'ageDays';
 let sortDir = -1;
 
@@ -208,6 +204,21 @@ function showRefreshInstructions() {
 }
 
 // ---- FILTERING ----
+function buildTypeChips() {
+  const types = [...new Set(RAW.map(r => r.Type).filter(Boolean))].sort();
+  activeTypes = new Set(types);
+  const container = document.getElementById('type-chips');
+  container.innerHTML = '';
+  types.forEach(type => {
+    const btn = document.createElement('button');
+    btn.className = 'type-chip active';
+    btn.dataset.type = type;
+    btn.textContent = type;
+    btn.onclick = () => toggleType(type);
+    container.appendChild(btn);
+  });
+}
+
 function toggleType(type) {
   if (activeTypes.has(type)) {
     if (activeTypes.size === 1) return; // keep at least one
@@ -250,9 +261,11 @@ function applyFilters() {
 
 // ---- SIDEBAR ----
 function buildSidebar(rows) {
+  // Always build sidebar from ALL records so people/properties are always visible
+  const allRows = RAW;
   // People
   const pCounts = {};
-  rows.forEach(r => {
+  allRows.forEach(r => {
     if (!r.AssignedUser) return;
     r.AssignedUser.split(',').map(p => p.trim()).filter(Boolean).forEach(p => {
       pCounts[p] = (pCounts[p] || 0) + 1;
@@ -271,7 +284,7 @@ function buildSidebar(rows) {
 
   // Properties
   const prCounts = {};
-  rows.forEach(r => { if (r.Property) prCounts[r.Property] = (prCounts[r.Property] || 0) + 1; });
+  allRows.forEach(r => { if (r.Property) prCounts[r.Property] = (prCounts[r.Property] || 0) + 1; });
   const propEl = document.getElementById('prop-list');
   propEl.innerHTML = '';
   Object.entries(prCounts).sort((a,b) => a[0].localeCompare(b[0])).forEach(([name, cnt]) => {
@@ -432,6 +445,7 @@ function clearSel() {
     }
   });
 })();
+buildTypeChips();
 applyFilters();
 </script>
 </body>
