@@ -8,7 +8,8 @@ Handles two AppFolio export formats:
 
 import os, base64, json, math, tempfile, re
 from datetime import datetime, timezone
-import urllib.request, urllib.parse
+import re
+import urllib.request, urllib.parse, re
 
 # ---- CONFIG ----
 CLIENT_ID     = os.environ["GMAIL_CLIENT_ID"]
@@ -180,18 +181,42 @@ def process_xlsx(xlsx_bytes):
             if not status:
                 continue
 
-            desc = str(row[12])[:300].strip() if len(row) > 12 and row[12] else None
-            url  = str(row[16]).strip() if len(row) > 16 and row[16] else (str(row[0]).strip() if row[0] and str(row[0]).startswith('http') else None)
+            # Col layout (confirmed from logs):
+            # 0=Property(full), 1=Priority, 2=WOType, 3=WONumber, 4=Status,
+            # 5=Unit, 6=CreatedAt, 7=CreatedBy, 8=AssignedUser(?),
+            # 16=JobDescription
+
+            # Find assigned user — search cols 7 onwards for a non-nan person name
+            assigned = None
+            for ci in range(7, min(12, len(row))):
+                v = str(row[ci]).strip() if row[ci] else ''
+                if v and v.lower() not in ('nan', 'no', 'yes', '') and not v.startswith('http') and not re.match(r'^\d', v):
+                    assigned = v
+                    break
+
+            desc = str(row[16])[:300].strip() if len(row) > 16 and row[16] else None
+            if desc and desc.lower() == 'nan':
+                desc = None
+
+            # URL — col 0 starts with http in this format
+            url = str(row[0]).strip() if row[0] and str(row[0]).startswith('http') else None
+
+            # Extract short property name (before the dash)
+            prop_raw = prop_col.get(i)
+            if prop_raw and ' - ' in prop_raw:
+                prop = prop_raw.split(' - ')[0].strip()
+            else:
+                prop = prop_raw
 
             r = {
-                "Property":     prop_col.get(i),
-                "Unit":         str(row[4]).strip() if len(row) > 4 and row[4] else None,
+                "Property":     prop,
+                "Unit":         str(row[5]).strip() if len(row) > 5 and row[5] else None,
                 "Status":       status,
-                "Priority":     str(row[7]).strip() if len(row) > 7 and row[7] else None,
-                "Type":         str(row[11]).strip() if len(row) > 11 and row[11] else None,
+                "Priority":     str(row[1]).strip() if len(row) > 1 and row[1] else None,
+                "Type":         str(row[2]).strip() if len(row) > 2 and row[2] else None,
                 "WONumber":     wo,
-                "AssignedUser": str(row[6]).strip() if len(row) > 6 and row[6] else None,
-                "CreatedAt":    str(row[2])[:10] if len(row) > 2 and row[2] else None,
+                "AssignedUser": assigned,
+                "CreatedAt":    str(row[6])[:10] if len(row) > 6 and row[6] else None,
                 "Description":  desc,
                 "URL":          url,
             }
