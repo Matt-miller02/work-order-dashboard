@@ -93,18 +93,17 @@ def process_xlsx(xlsx_bytes):
         f.write(xlsx_bytes)
         tmp_path = f.name
 
-    # Auto-detect header row — find the first row with 4+ non-null values
-    # that contains known column names
+    # Find the correct header row — must contain 'Assigned User' and 'PropertyAbbrev'
+    # The file has multiple tables; we want the one with the work order detail data
     raw = pd.read_excel(tmp_path, sheet_name=0, header=None)
     header_row = 0
     for i in range(len(raw)):
         row_vals = [str(v).strip() for v in raw.iloc[i].tolist() if str(v) != 'nan']
-        row_str = ' '.join(row_vals).lower()
-        if 'work order' in row_str or 'assigned user' in row_str or 'status' in row_str:
-            if len(row_vals) >= 4:
-                header_row = i
-                print(f"  Header row detected at row {i}: {row_vals[:6]}")
-                break
+        # Must contain these specific columns to be the right table
+        if 'Assigned User' in row_vals and ('PropertyAbbrev' in row_vals or 'Link' in row_vals):
+            header_row = i
+            print(f"  Header row detected at row {i}: {row_vals[:6]}")
+            break
 
     df = pd.read_excel(tmp_path, sheet_name=0, header=header_row)
     print(f"  Columns: {df.columns.tolist()[:8]}")
