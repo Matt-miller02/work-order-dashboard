@@ -141,8 +141,22 @@ def process_xlsx(xlsx_bytes):
                 print(f"  Data starts at row {i}")
                 break
 
+        # Col mapping (0-indexed):
+        # 0=URL, 1=PropertyAbbrev(sparse), 2=CreatedAt, 3=WONumber, 4=Unit,
+        # 5=Status, 6=AssignedUser, 7=Priority, 8=ResidentRequested, 9=Recurring,
+        # 10=CreatedBy, 11=WorkOrderType, 12=Description, 13-15=comments,
+        # 16=AppFolioLink
+
+        # Forward-fill PropertyAbbrev (col 1) since it's sparse
+        last_prop = None
+        prop_col = {}
+        for i in range(data_start, len(raw)):
+            val = clean(raw.iloc[i, 1])
+            if val:
+                last_prop = val
+            prop_col[i] = last_prop
+
         records = []
-        current_property = None
         for i in range(data_start, len(raw)):
             row = raw.iloc[i].tolist()
             row = [clean(v) for v in row]
@@ -152,35 +166,24 @@ def process_xlsx(xlsx_bytes):
             if not wo or not wo_pattern.match(wo):
                 continue
 
-            status = str(row[4]).strip() if row[4] else None
-            if not status:
+            status = str(row[5]).strip() if len(row) > 5 and row[5] else None
+            if not status or status not in OPEN_STATUSES:
                 continue
 
-            # Only include open statuses
-            if status not in OPEN_STATUSES:
-                continue
-
-            # Extract property name — strip address after the dash
-            prop_raw = str(row[0]).strip() if row[0] else None
-            if prop_raw and ' - ' in prop_raw:
-                prop = prop_raw.split(' - ')[0].strip()
-            else:
-                prop = prop_raw
-
-            # Assigned user is col 8 (if exists)
-            assigned = str(row[8]).strip() if len(row) > 8 and row[8] else None
+            desc = str(row[12])[:300].strip() if len(row) > 12 and row[12] else None
+            url  = str(row[16]).strip() if len(row) > 16 and row[16] else (str(row[0]).strip() if row[0] and str(row[0]).startswith('http') else None)
 
             r = {
-                "Property":     prop,
-                "Unit":         str(row[5]).strip() if row[5] else None,
+                "Property":     prop_col.get(i),
+                "Unit":         str(row[4]).strip() if len(row) > 4 and row[4] else None,
                 "Status":       status,
-                "Priority":     str(row[1]).strip() if row[1] else None,
-                "Type":         str(row[2]).strip() if row[2] else None,
+                "Priority":     str(row[7]).strip() if len(row) > 7 and row[7] else None,
+                "Type":         str(row[11]).strip() if len(row) > 11 and row[11] else None,
                 "WONumber":     wo,
-                "AssignedUser": assigned,
-                "CreatedAt":    str(row[6])[:10] if row[6] else None,
-                "Description":  None,
-                "URL":          None,
+                "AssignedUser": str(row[6]).strip() if len(row) > 6 and row[6] else None,
+                "CreatedAt":    str(row[2])[:10] if len(row) > 2 and row[2] else None,
+                "Description":  desc,
+                "URL":          url,
             }
             records.append(r)
 
