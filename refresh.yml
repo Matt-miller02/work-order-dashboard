@@ -2,16 +2,16 @@ name: Refresh Work Order Dashboard
 
 on:
   schedule:
-    # Runs every day at 4:30 PM UTC = ~10:30 AM Mountain / 11:30 AM Eastern
-    # Beryl sends the email around 3:25 PM UTC (9:25 AM Mountain), so this gives plenty of buffer
-    - cron: '30 16 * * 1-5'   # Weekdays only
-  workflow_dispatch:            # Also allows manual trigger from GitHub UI
+    # Runs every weekday at noon UTC = 6 AM Mountain
+    # AppFolio sends the email at ~10:17 UTC (4:17 AM Mountain), plenty of buffer
+    - cron: '0 12 * * 1-5'
+  workflow_dispatch: # Also allows manual trigger from GitHub Actions UI
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
     permissions:
-      contents: write           # Needed to push the updated index.html
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -27,7 +27,9 @@ jobs:
 
       - name: Run refresh script
         env:
-          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+          GMAIL_CLIENT_ID:     ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
         run: python refresh_dashboard.py
 
       - name: Commit and push updated dashboard
