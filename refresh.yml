@@ -1,0 +1,39 @@
+name: Refresh Work Order Dashboard
+
+on:
+  schedule:
+    # Runs every day at 4:30 PM UTC = ~10:30 AM Mountain / 11:30 AM Eastern
+    # Beryl sends the email around 3:25 PM UTC (9:25 AM Mountain), so this gives plenty of buffer
+    - cron: '30 16 * * 1-5'   # Weekdays only
+  workflow_dispatch:            # Also allows manual trigger from GitHub UI
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write           # Needed to push the updated index.html
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run refresh script
+        env:
+          GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+        run: python refresh_dashboard.py
+
+      - name: Commit and push updated dashboard
+        run: |
+          git config user.name  "Dashboard Bot"
+          git config user.email "bot@thesitusgroup.com"
+          git add index.html
+          git diff --staged --quiet || git commit -m "Dashboard refresh $(date -u +'%Y-%m-%d')"
+          git push
