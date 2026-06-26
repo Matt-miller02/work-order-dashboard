@@ -156,6 +156,11 @@ def process_xlsx(xlsx_bytes):
                 last_prop = val
             prop_col[i] = last_prop
 
+        # Print first 3 data rows so we can verify column positions
+        print("  First 3 data rows for column verification:")
+        for di in range(data_start, min(data_start+3, len(raw))):
+            print(f"    Row {di}: {[str(v).strip() for v in raw.iloc[di].tolist()]}")
+
         records = []
         for i in range(data_start, len(raw)):
             row = raw.iloc[i].tolist()
@@ -166,8 +171,13 @@ def process_xlsx(xlsx_bytes):
             if not wo or not wo_pattern.match(wo):
                 continue
 
-            status = str(row[5]).strip() if len(row) > 5 and row[5] else None
-            if not status or status not in OPEN_STATUSES:
+            # Find status — search all columns for a known status value
+            status = None
+            for col_idx, val in enumerate(row):
+                if str(val).strip() in OPEN_STATUSES:
+                    status = str(val).strip()
+                    break
+            if not status:
                 continue
 
             desc = str(row[12])[:300].strip() if len(row) > 12 and row[12] else None
