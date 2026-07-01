@@ -1,0 +1,38 @@
+name: Refresh Work Order Dashboard
+
+on:
+  schedule:
+    # Runs every weekday at 1 PM UTC = 7 AM Mountain (Daylight Time)
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch: # Also allows manual trigger from GitHub Actions UI
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run refresh script
+        env:
+          DRIVE_FILE_ID: 1KaMScsd7By3MCBjI-Zc0MTpjgvwA9Bz-
+        run: python refresh_dashboard.py
+
+      - name: Commit and push updated dashboard
+        run: |
+          git config user.name  "Dashboard Bot"
+          git config user.email "bot@thesitusgroup.com"
+          git add index.html
+          git diff --staged --quiet || git commit -m "Dashboard refresh $(date -u +'%Y-%m-%d')"
+          git push
