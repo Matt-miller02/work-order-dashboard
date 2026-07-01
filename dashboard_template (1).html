@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Order Dashboard</title>
+<style>
+  :root {
+    --bg: #f0f4f8; --surface: #fff; --surface2: #f8fafc; --border: #e2e8f0;
+    --primary: #2563eb; --primary-light: #dbeafe; --text: #1e293b; --text-muted: #64748b;
+    --success: #16a34a; --warning: #d97706; --danger: #dc2626; --shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header { background: var(--primary); color: #fff; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  header h1 { font-size: 1.15rem; font-weight: 700; }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .data-info { font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
+  .refresh-btn { background: rgba(255,255,255,0.15); border: 1.5px solid rgba(255,255,255,0.4); color: #fff; border-radius: 8px; padding: 6px 16px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; font-weight: 600; }
+  .refresh-btn:hover { background: rgba(255,255,255,0.28); }
+
+  .refresh-banner { background: #1e40af; color: #bfdbfe; padding: 10px 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 10px; }
+  .refresh-banner strong { color: #fff; }
+
+  .filter-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
+  select, input[type=search] { border: 1.5px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; background: var(--surface2); color: var(--text); outline: none; }
+  select:focus, input[type=search]:focus { border-color: var(--primary); background: #fff; }
+  select { min-width: 150px; }
+  .search-input { width: 220px; }
+  .stats-row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-left: auto; }
+  .stat-pill { background: var(--primary-light); color: var(--primary); border-radius: 20px; padding: 4px 12px; font-size: 0.73rem; font-weight: 700; white-space: nowrap; }
+  .stat-pill.red { background: #fee2e2; color: #991b1b; }
+
+  .app { display: flex; height: calc(100vh - 145px); }
+
+  .sidebar { width: 255px; min-width: 255px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-section { padding: 11px 13px 8px; border-bottom: 1px solid var(--border); }
+  .sidebar-section.scrollable { border-bottom: none; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+  .sidebar-label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 7px; }
+
+  .chip-list { display: flex; flex-wrap: wrap; gap: 5px; }
+  .type-chip-list { display: flex; gap: 5px; flex-wrap: wrap; }
+  .type-chip { border: 1.5px solid var(--border); background: var(--surface2); border-radius: 20px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; transition: all 0.12s; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
+  .type-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .type-chip:hover:not(.active) { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+  .chip { border: 1.5px solid var(--border); background: var(--surface2); border-radius: 20px; padding: 3px 10px; font-size: 0.73rem; cursor: pointer; transition: all 0.12s; color: var(--text); font-weight: 500; white-space: nowrap; }
+  .chip:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+  .chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .chip .ct { display: inline-block; background: rgba(0,0,0,0.12); border-radius: 10px; padding: 0 5px; font-size: 0.66rem; margin-left: 3px; }
+  .chip.active .ct { background: rgba(255,255,255,0.25); }
+
+  .prop-list { flex: 1; }
+  .prop-item { display: flex; align-items: center; justify-content: space-between; padding: 7px 13px; cursor: pointer; border-left: 3px solid transparent; transition: all 0.1s; font-size: 0.78rem; }
+  .prop-item:hover { background: var(--primary-light); border-left-color: #93c5fd; }
+  .prop-item.active { background: var(--primary-light); border-left-color: var(--primary); font-weight: 600; color: var(--primary); }
+  .prop-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prop-badge { background: #f1f5f9; border-radius: 10px; padding: 1px 7px; font-size: 0.66rem; color: var(--text-muted); font-weight: 600; flex-shrink: 0; margin-left: 6px; }
+  .prop-item.active .prop-badge { background: var(--primary); color: #fff; }
+
+  .main { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 13px; }
+
+  .view-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .view-title { font-size: 1.05rem; font-weight: 700; }
+  .view-subtitle { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
+  .clear-btn { background: none; border: 1.5px solid var(--border); border-radius: 8px; padding: 4px 12px; font-size: 0.73rem; cursor: pointer; color: var(--text-muted); transition: all 0.12s; }
+  .clear-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+  .summary-cards { display: flex; gap: 10px; flex-wrap: wrap; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 11px 15px; flex: 1; min-width: 100px; box-shadow: var(--shadow); }
+  .card-label { font-size: 0.62rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+  .card-value { font-size: 1.25rem; font-weight: 700; }
+  .green { color: var(--success); } .amber { color: var(--warning); } .red { color: var(--danger); }
+
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+  .table-header { padding: 9px 13px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border-radius: 10px 10px 0 0; }
+  .table-title { font-size: 0.8rem; font-weight: 700; }
+  .results-count { font-size: 0.7rem; color: var(--text-muted); }
+  .table-scroll { overflow-x: auto; border-radius: 0 0 10px 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.77rem; }
+  thead th { padding: 7px 11px; text-align: left; font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); background: var(--surface2); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
+  thead th:hover, thead th.sorted { color: var(--primary); }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--primary-light); }
+  tbody td { padding: 7px 11px; vertical-align: top; }
+  .wo-num { font-weight: 700; color: var(--primary); font-size: 0.8rem; white-space: nowrap; text-decoration: none; }
+  a.wo-num:hover { text-decoration: underline; }
+  .af-link { display: block; color: var(--primary); text-decoration: none; font-size: 0.68rem; margin-top: 2px; opacity: 0.8; }
+  .af-link:hover { text-decoration: underline; opacity: 1; }
+  .status-pill { display: inline-block; border-radius: 12px; padding: 2px 8px; font-size: 0.66rem; font-weight: 700; white-space: nowrap; }
+  .s-Assigned { background: #fef3c7; color: #92400e; }
+  .s-New { background: #fee2e2; color: #991b1b; }
+  .s-Scheduled { background: #e0e7ff; color: #3730a3; }
+  .s-WorkDone { background: #d1fae5; color: #065f46; }
+  .s-Completed { background: #d1fae5; color: #065f46; }
+  .s-Canceled { background: #f1f5f9; color: #94a3b8; }
+  .s-Estimate { background: #fce7f3; color: #9d174d; }
+  .p-Urgent { color: var(--danger); font-weight: 700; }
+  .p-Normal { color: var(--text-muted); }
+  .desc-text { max-width: 260px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; color: var(--text-muted); font-size: 0.72rem; }
+  .tag { display: inline-block; background: #f1f5f9; border-radius: 6px; padding: 1px 7px; font-size: 0.66rem; color: var(--text-muted); font-weight: 600; }
+  .age-pill { display: inline-block; border-radius: 12px; padding: 2px 8px; font-size: 0.66rem; font-weight: 700; white-space: nowrap; }
+  .age-ok     { background: #f1f5f9; color: var(--text-muted); }
+  .age-warn   { background: #fef9c3; color: #854d0e; }
+  .age-danger { background: #fee2e2; color: #991b1b; }
+  tr.row-warn   { background: #fffbeb !important; }
+  tr.row-warn:hover { background: #fef3c7 !important; }
+  tr.row-danger { background: #fff1f2 !important; }
+  tr.row-danger:hover { background: #ffe4e6 !important; }
+
+  .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 60px 20px; text-align: center; color: var(--text-muted); }
+  .welcome h2 { font-size: 1.15rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .welcome p { font-size: 0.83rem; max-width: 380px; line-height: 1.6; }
+  .welcome .arrow { font-size: 2rem; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>&#128295; Work Order Dashboard</h1>
+    <div class="data-info" id="data-info">Data as of DATE_PLACEHOLDER &mdash; COUNT_PLACEHOLDER work orders</div>
+  </div>
+  <div class="header-right">
+    <button class="refresh-btn" onclick="showRefreshInstructions()">&#8635; Refresh Data</button>
+  </div>
+</header>
+
+<div class="refresh-banner">
+  <span>&#128337;</span>
+  <span><strong>To get the latest data:</strong> click <em>Refresh Data</em> above, then ask Claude to regenerate this dashboard from the updated Drive file. A new file will be ready to replace this one.</span>
+</div>
+
+<div class="filter-bar">
+  <div class="filter-group">
+    <div class="filter-label">Status</div>
+    <select id="filter-status" onchange="applyFilters()">
+      <option value="open" selected>Open Only</option>
+      <option value="">All Statuses</option>
+      <option value="Assigned">Assigned</option>
+      <option value="New">New</option>
+      <option value="Scheduled">Scheduled</option>
+      <option value="Work Done">Work Done</option>
+      <option value="Completed">Completed</option>
+      <option value="Canceled">Canceled</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Type</div>
+    <div class="type-chip-list" id="type-chips"></div>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Priority</div>
+    <select id="filter-priority" onchange="applyFilters()">
+      <option value="">All Priorities</option>
+      <option value="Urgent">Urgent</option>
+      <option value="Normal">Normal</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Search</div>
+    <input type="search" class="search-input" id="filter-search" placeholder="WO #, description, unit…" oninput="applyFilters()">
+  </div>
+  <div class="stats-row">
+    <span class="stat-pill" id="hdr-showing">— records</span>
+    <span class="stat-pill red" id="hdr-urgent">— urgent</span>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">&#128100; Person</div>
+      <div class="chip-list" id="people-chips"></div>
+    </div>
+    <div class="sidebar-section scrollable">
+      <div class="sidebar-label">&#127968; Property</div>
+      <div class="prop-list" id="prop-list"></div>
+    </div>
+  </aside>
+  <main class="main" id="main-content">
+    <div class="welcome">
+      <div class="arrow">&#8592;</div>
+      <h2>Select a person and/or property</h2>
+      <p>Use the filters above to narrow by status, type, or priority &mdash; then click a person <strong>and/or</strong> a property on the left. Both can be active at once to narrow results further.</p>
+    </div>
+  </main>
+</div>
+
+<script>
+const OPEN_STATUSES = new Set(['Assigned','New','Scheduled','Estimate Requested']);
+const RAW = DATA_PLACEHOLDER;
+
+let activePeople = new Set();
+let activeProp   = null;
+let activeTypes  = new Set();
+let sortCol = 'ageDays';
+let sortDir = -1;
+
+function showRefreshInstructions() {
+  alert('To refresh:\n\n1. Come back to this Claude chat\n2. Type: "Refresh my work order dashboard from Drive"\n3. Download the new file and replace this one\n\nYour data will reflect whatever is currently in the Google Drive file.');
+}
+
+// ---- FILTERING ----
+function buildTypeChips() {
+  const types = [...new Set(RAW.map(r => r.Type).filter(Boolean))].sort();
+  activeTypes = new Set(types);
+  const container = document.getElementById('type-chips');
+  container.innerHTML = '';
+  types.forEach(type => {
+    const btn = document.createElement('button');
+    btn.className = 'type-chip active';
+    btn.dataset.type = type;
+    btn.textContent = type;
+    btn.onclick = () => toggleType(type);
+    container.appendChild(btn);
+  });
+}
+
+function toggleType(type) {
+  if (activeTypes.has(type)) {
+    if (activeTypes.size === 1) return; // keep at least one
+    activeTypes.delete(type);
+  } else {
+    activeTypes.add(type);
+  }
+  document.querySelectorAll('.type-chip').forEach(c => {
+    c.classList.toggle('active', activeTypes.has(c.dataset.type));
+  });
+  applyFilters();
+}
+
+function getFiltered() {
+  const status   = document.getElementById('filter-status').value;
+  const priority = document.getElementById('filter-priority').value;
+  const search   = (document.getElementById('filter-search').value || '').toLowerCase();
+
+  return RAW.filter(r => {
+    if (status === 'open' && !OPEN_STATUSES.has(r.Status)) return false;
+    if (status && status !== 'open' && r.Status !== status) return false;
+    if (!activeTypes.has(r.Type)) return false;
+    if (priority && r.Priority !== priority) return false;
+    if (search) {
+      const hay = [r.WONumber, r.Description, r.Unit, r.Property, r.AssignedUser].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function applyFilters() {
+  const f = getFiltered();
+  const urgent = f.filter(r => r.Priority === 'Urgent').length;
+  document.getElementById('hdr-showing').textContent = f.length + ' records';
+  document.getElementById('hdr-urgent').textContent  = urgent + ' urgent';
+  buildSidebar(f);
+  renderCombined();
+}
+
+// ---- SIDEBAR ----
+function buildSidebar(rows) {
+  // Always build sidebar from ALL records so people/properties are always visible
+  const allRows = RAW;
+  // People
+  const pCounts = {};
+  allRows.forEach(r => {
+    if (!r.AssignedUser) return;
+    r.AssignedUser.split(',').map(p => p.trim()).filter(Boolean).forEach(p => {
+      pCounts[p] = (pCounts[p] || 0) + 1;
+    });
+  });
+  const peopleEl = document.getElementById('people-chips');
+  peopleEl.innerHTML = '';
+  Object.entries(pCounts).sort((a,b) => b[1]-a[1]).forEach(([name, cnt]) => {
+    const c = document.createElement('button');
+    c.className = 'chip' + (activePeople.has(name) ? ' active' : '');
+    c.dataset.person = name;
+    c.innerHTML = name + `<span class="ct">${cnt}</span>`;
+    c.onclick = () => selectPerson(name);
+    peopleEl.appendChild(c);
+  });
+
+  // Properties
+  const prCounts = {};
+  allRows.forEach(r => { if (r.Property) prCounts[r.Property] = (prCounts[r.Property] || 0) + 1; });
+  const propEl = document.getElementById('prop-list');
+  propEl.innerHTML = '';
+  Object.entries(prCounts).sort((a,b) => a[0].localeCompare(b[0])).forEach(([name, cnt]) => {
+    const item = document.createElement('div');
+    item.className = 'prop-item' + (activeProp === name ? ' active' : '');
+    item.dataset.prop = name;
+    item.innerHTML = `<span class="prop-name" title="${name}">${name}</span><span class="prop-badge">${cnt}</span>`;
+    item.onclick = () => selectProperty(name);
+    propEl.appendChild(item);
+  });
+}
+
+// ---- SELECTION ----
+function selectPerson(name) {
+  if (activePeople.has(name)) activePeople.delete(name);
+  else activePeople.add(name);
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', activePeople.has(c.dataset.person)));
+  renderCombined();
+}
+
+function selectProperty(name) {
+  activeProp = activeProp === name ? null : name;
+  document.querySelectorAll('.prop-item').forEach(i => i.classList.toggle('active', i.dataset.prop === activeProp));
+  renderCombined();
+}
+
+function renderCombined() {
+  if (!activePeople.size && !activeProp) { showWelcome(); return; }
+  let rows = getFiltered();
+  if (activePeople.size) rows = rows.filter(r => r.AssignedUser && r.AssignedUser.split(',').map(p=>p.trim()).some(p => activePeople.has(p)));
+  if (activeProp)        rows = rows.filter(r => r.Property === activeProp);
+  const peoplePart = activePeople.size ? [...activePeople].join(', ') : null;
+  const title = [peoplePart, activeProp].filter(Boolean).join(' · ');
+  const subtitle = activePeople.size && activeProp
+    ? peoplePart + ' at ' + activeProp
+    : activePeople.size ? 'Assigned work orders' : 'All work orders';
+  renderView({ title, subtitle, rows, showProp: !activeProp, showAssignee: activePeople.size !== 1 });
+}
+
+function showWelcome() {
+  document.getElementById('main-content').innerHTML = `
+    <div class="welcome">
+      <div class="arrow">&#8592;</div>
+      <h2>Select a person and/or property</h2>
+      <p>Use the filters above to narrow by status, type, or priority &mdash; then click a person <strong>and/or</strong> a property on the left. Both can be active at once to narrow results further.</p>
+    </div>`;
+}
+
+// ---- RENDER TABLE ----
+function renderView({ title, subtitle, rows, showProp, showAssignee }) {
+  const open      = rows.filter(r => OPEN_STATUSES.has(r.Status)).length;
+  const urgent    = rows.filter(r => r.Priority === 'Urgent').length;
+  const completed = rows.filter(r => r.Status === 'Work Done' || r.Status === 'Completed').length;
+
+  const sorted = sortRows([...rows]);
+
+  const cols = [
+    { key: 'WONumber',     label: 'WO #' },
+    ...(showProp     ? [{ key: 'Property',    label: 'Property'   }] : []),
+    { key: 'Unit',         label: 'Unit'     },
+    { key: 'Status',       label: 'Status'   },
+    { key: 'Priority',     label: 'Priority' },
+    { key: 'Type',         label: 'Type'     },
+    { key: 'CreatedAt',    label: 'Created'  },
+    { key: 'ageDays',      label: 'Age'      },
+    ...(showAssignee ? [{ key: 'AssignedUser', label: 'Assigned To' }] : []),
+    { key: 'Description',  label: 'Description' },
+  ];
+
+  const ths = cols.map(c => {
+    const active = sortCol === c.key;
+    return `<th class="${active?'sorted':''}" onclick="resort('${c.key}')">${c.label}${active?(sortDir===1?' ▲':' ▼'):''}</th>`;
+  }).join('');
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const trs = sorted.map(r => {
+    const sKey = (r.Status||'').replace(/\s/g,'');
+    const sClass = { Assigned:'s-Assigned', New:'s-New', Scheduled:'s-Scheduled',
+                     WorkDone:'s-WorkDone', Completed:'s-Completed',
+                     Canceled:'s-Canceled', EstimateRequested:'s-Estimate' }[sKey] || '';
+    const woNum = r.URL
+      ? `<a class="wo-num" href="${r.URL}" target="_blank" rel="noopener">${r.WONumber||'—'}</a>`
+      : `<span class="wo-num">${r.WONumber||'—'}</span>`;
+    const link = r.URL ? `<a class="af-link" href="${r.URL}" target="_blank">Open in AppFolio ↗</a>` : '';
+    const age = r.ageDays != null ? r.ageDays : null;
+    const ageClass = age == null ? 'age-ok' : age >= 30 ? 'age-danger' : age >= 10 ? 'age-warn' : 'age-ok';
+    const ageLabel = age != null ? age + 'd' : '—';
+    const rowClass = age >= 30 ? 'row-danger' : age >= 10 ? 'row-warn' : '';
+    return `<tr class="${rowClass}">
+      <td>${woNum}${link}</td>
+      ${showProp ? `<td><span class="tag">${r.Property||'—'}</span></td>` : ''}
+      <td>${r.Unit!=null?r.Unit:'—'}</td>
+      <td><span class="status-pill ${sClass}">${r.Status||'—'}</span></td>
+      <td class="p-${r.Priority}">${r.Priority||'—'}</td>
+      <td>${r.Type||'—'}</td>
+      <td style="white-space:nowrap">${r.CreatedAt||'—'}</td>
+      <td><span class="age-pill ${ageClass}">${ageLabel}</span></td>
+      ${showAssignee ? `<td style="font-size:0.73rem">${r.AssignedUser||'<span style="color:var(--text-muted)">Unassigned</span>'}</td>` : ''}
+      <td><div class="desc-text">${r.Description||'—'}</div></td>
+    </tr>`;
+  }).join('');
+
+  const tableHtml = sorted.length === 0
+    ? '<div style="padding:40px;text-align:center;color:var(--text-muted)">No records match current filters</div>'
+    : `<div class="table-scroll"><table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+
+  document.getElementById('main-content').innerHTML = `
+    <div class="view-header">
+      <div>
+        <div class="view-title">&#128205; ${title}</div>
+        <div class="view-subtitle">${subtitle}</div>
+      </div>
+      <button class="clear-btn" onclick="clearSel()">&#x2715; Clear</button>
+    </div>
+    <div class="summary-cards">
+      <div class="card"><div class="card-label">Total</div><div class="card-value">${rows.length}</div></div>
+      <div class="card"><div class="card-label">Open</div><div class="card-value red">${open}</div></div>
+      <div class="card"><div class="card-label">Urgent</div><div class="card-value amber">${urgent}</div></div>
+      <div class="card"><div class="card-label">Completed</div><div class="card-value green">${completed}</div></div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <span class="table-title">Work Orders</span>
+        <span class="results-count">${sorted.length} record${sorted.length!==1?'s':''}</span>
+      </div>
+      ${tableHtml}
+    </div>`;
+}
+
+function sortRows(rows) {
+  return rows.sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (va==null && vb==null) return 0;
+    if (va==null) return 1; if (vb==null) return -1;
+    if (typeof va==='string') return va.localeCompare(vb)*sortDir;
+    return (va-vb)*sortDir;
+  });
+}
+
+function resort(col) {
+  if (sortCol===col) sortDir*=-1; else { sortCol=col; sortDir=1; }
+  renderCombined();
+}
+
+function clearSel() {
+  activePeople.clear(); activeProp=null;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.prop-item').forEach(i=>i.classList.remove('active'));
+  showWelcome();
+}
+
+// Boot — pre-compute age in days for every record
+(function() {
+  const now = new Date(); now.setHours(0,0,0,0);
+  RAW.forEach(r => {
+    if (r.CreatedAt) {
+      const d = new Date(r.CreatedAt);
+      r.ageDays = Math.floor((now - d) / 86400000);
+    } else {
+      r.ageDays = null;
+    }
+  });
+})();
+buildTypeChips();
+applyFilters();
+</script>
+</body>
+</html>
